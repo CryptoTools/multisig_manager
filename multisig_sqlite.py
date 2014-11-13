@@ -16,23 +16,23 @@ c.execute('CREATE TABLE IF NOT EXISTS multisig_own(crypto_key_id INTEGER,multisi
 conn.commit()
 
 def get_m_n_for_multisig_address(multisig_address):
-    c.execute('SELECT * FROM multisig_addr WHERE address = "{}"'.format(multisig_address))
+    c.execute('SELECT * FROM multisig_addr WHERE address = ?',(multisig_address,))
     row=c.fetchone()
     return (row[3],row[4])
 
 
 # get all public key used to create the multisig address
 def get_keys_for_multisig_address(multisig_address):
-    c.execute('SELECT * FROM multisig_addr WHERE address = "{}"'.format(multisig_address))
+    c.execute('SELECT * FROM multisig_addr WHERE address = ?',(multisig_address,))
     row=c.fetchone()
     multisig_addr_id=row[0]
 
-    text_str='SELECT crypto_key_id FROM multisig_own WHERE multisig_addr_id = {}'.format(multisig_addr_id)
+    text_str='SELECT crypto_key_id FROM multisig_own WHERE multisig_addr_id = ?',(multisig_addr_id,)
     c.execute(text_str)
     crypto_key_ids = c.fetchall()
     list_keys=[]
     for id in crypto_key_ids:
-        c.execute('SELECT * FROM crypto_key WHERE crypto_key_id = {}'.format(id[0]))
+        c.execute('SELECT * FROM crypto_key WHERE crypto_key_id = ?',(id[0],))
         row=c.fetchone()
         public_key=row[2] 
         private_key=row[3]
@@ -67,7 +67,7 @@ def create_multisig_address(crypto,m,n,pub_key_list):
 
     crypto_key_id_list=[]
     for pub_key in pub_key_list:
-        c.execute('SELECT * FROM crypto_key WHERE public_key = "{}"'.format(pub_key))
+        c.execute('SELECT * FROM crypto_key WHERE public_key = ?',(pub_key,))
         rows=c.fetchall()
         # create crypto_key entry if public key is not found in database
         if len(rows) ==0:
