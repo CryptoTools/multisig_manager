@@ -1,0 +1,4 @@
+pybitcointools/
+*.db
+*.pyc
+*.swp

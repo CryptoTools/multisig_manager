@@ -1,0 +1,25 @@
+TODO 
+
+When creating multisig address, have the user choose from alreayd created public key instaed of making new one
+
+Password protection , maybe use sql-cipher binding for python or simplecrypt (uses pycrypto)
+
+Way to switch between LTC and BTC (switch button on the menu in main window?) 
+
+pybitcointools require litecoin toshi unspent functions in bci.py for it to work with litecoins 
+
+Can put column for unspent amount in list multisig address 
+
+push tx script out to network
+
+Need to be able to copy stuff from list dialogue
+
+
+CONSIDER
+
+Way to send "public key files" and load them into multisig gui to create multisignature addresses 
+
+Way to send "signature request files" and load them into multisig gui, so that you can create 
+    signatures with the public keys that belong to you 
+
+Way to send "signatues" and load them into multisig gui 
