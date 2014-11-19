@@ -8,7 +8,7 @@ import pybitcointools
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-CRYPTO_TYPES=['Bitcoin','Litecoin']
+CRYPTO_TYPES=['Bitcoin','Litecoin','Dogecoin']
 MAX_M=10
 MAX_N=10
 
@@ -18,6 +18,29 @@ def APP_ERROR(parent,msg):
 
 def APP_MESSAGE(parent,msg):
     QMessageBox.about(parent,"Info",msg)
+
+# Base class for all dialogues 
+class BaseDialog(QDialog):
+    def __init__(self,window_title,parent=None):
+        QDialog.__init__(self,parent)
+        self.setWindowTitle(window_title)
+        self.layout=QGridLayout()
+        self.setLayout(self.layout) 
+        self.list_of_widgets=[]
+
+    # add new widget in dialogue 
+    def addWidgetToDialog(self,widget):
+        self.layout.addWidget(widget) 
+        self.list_of_widgets.append(widget)
+   
+    # disable all widgets that have been added to dialogue 
+    def disableAllWidgets(self):
+        for widget in self.list_of_widgets:
+            widget.setEnabled(False)
+
+    def fixToMinimumSize(self):
+        self.resize(0,0)
+        self.setFixedSize(self.size())
 
 class CreatePublicKeyDialog(QDialog):
     def __init__(self,crypto_type,parent=None):
@@ -39,7 +62,6 @@ class CreatePublicKeyDialog(QDialog):
         self.yes_encrypt_button.setEnabled(False)
         self.no_encrypt_button.setEnabled(False)
     
-
     def case_no_encrypt(self):
         self._disable_yes_no_buttons()
         pub_key=multisig_sqlite.create_key(self.crypto_type)
@@ -242,7 +264,6 @@ class SendTransactionDialog(QDialog):
             cur_sig_list=self.sig_list.get_signatures_as_list(unspent_i)
             tx=pybitcointools.apply_multisignatures(tx,unspent_i,multisig_script,cur_sig_list)
         APP_MESSAGE(self,tx)
-        print(tx)
         return tx 
 
 class CreateMultiSigDialog(QDialog):
@@ -532,8 +553,10 @@ class MyForm(QMainWindow):
         self.connect(self.createMultisigButton,SIGNAL("clicked()"),self.createMultisig)
         self.connect(self.listMultisigButton,SIGNAL("clicked()"),self.listMultisig)
         self.connect(self.sendTransactionButton,SIGNAL("clicked()"),self.sendTransaction)
+        
+        self.resize(0,0)
+        self.setFixedSize(self.size())
 
-        #self.setFixedSize(self.size())
     def _getSelectedCrypto(self):
         return str(self.coin_select_combo_box.currentText())
     

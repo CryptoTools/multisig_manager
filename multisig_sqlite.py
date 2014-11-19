@@ -4,9 +4,10 @@ import pybitcointools
 import simplecrypt
 
 SQLITE_FILENAME='multisig_gui.db'
+SCRIPT_HASH_VERSION_BYTE={'Bitcoin':5,'Litecoin':5,'Dogecoin':22}  
 
 # set up sqlite
-conn=sqlite3.connect(SQLITE_FILENAME,detect_types=sqlite3.PARSE_DECLTYPES)#after converting to server mode, remove check_same_thread=False
+conn=sqlite3.connect(SQLITE_FILENAME,detect_types=sqlite3.PARSE_DECLTYPES)
 conn.text_factory=str
 c=conn.cursor()
 c.execute('CREATE TABLE IF NOT EXISTS crypto_key \
@@ -27,8 +28,7 @@ def get_keys_for_multisig_address(multisig_address):
     row=c.fetchone()
     multisig_addr_id=row[0]
 
-    text_str='SELECT crypto_key_id FROM multisig_own WHERE multisig_addr_id = ?',(multisig_addr_id,)
-    c.execute(text_str)
+    c.execute('SELECT crypto_key_id FROM multisig_own WHERE multisig_addr_id = ?',(multisig_addr_id,))
     crypto_key_ids = c.fetchall()
     list_keys=[]
     for id in crypto_key_ids:
@@ -78,7 +78,7 @@ def create_multisig_address(crypto,m,n,pub_key_list):
         else:           
             crypto_key_id_list.append(rows[0][0])
     script=pybitcointools.mk_multisig_script(pub_key_list,m)
-    address=pybitcointools.scriptaddr(script)
+    address=pybitcointools.scriptaddr(script,SCRIPT_HASH_VERSION_BYTE[crypto])
     
     c.execute('INSERT INTO multisig_addr(crypto,address,m,n,timestamp) VALUES(?,?,?,?,?)',
               (crypto,address,m,n,datetime.datetime.now()))

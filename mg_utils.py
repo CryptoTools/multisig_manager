@@ -2,8 +2,8 @@
 #
 
 
-
 # Just a 2-d list to store signature temporarily
+# Used in dialogue to craft multisig transactions
 class SignatureList(object):
 
     def __init__(self,num_unspents,num_keys):

@@ -1,12 +1,16 @@
-TODO 
+TODO LIST
 
-When creating multisig address, have the user choose from alreayd created public key instaed of making new one
+Better Name ?
 
-Password protection , maybe use sql-cipher binding for python or simplecrypt (uses pycrypto)
+Base dialogue class for cleaner code
 
-Way to switch between LTC and BTC (switch button on the menu in main window?) 
+DONE When creating multisig address, have the user choose from alreayd created public key instaed of making new one
 
-pybitcointools require litecoin toshi unspent functions in bci.py for it to work with litecoins 
+DONE Password protection , maybe use sql-cipher binding for python or simplecrypt (uses pycrypto)
+
+DONE Way to switch between LTC and BTC (switch button on the menu in main window?) 
+
+DONE pybitcointools require litecoin toshi unspent functions in bci.py for it to work with litecoins 
 
 Can put column for unspent amount in list multisig address 
 

@@ -1,12 +1,6 @@
-Multisig GUI is a GUI based python tool for working with multisignature addresses in Bitcoin (it also works with
-Litecoin, as it uses the same exact method for p2sh multisignature transactions). It can create and keep track 
-of multisignature addresses, send coins from a multisignature address, and create signatures for authorizing 
-sends from multisignature addresses. 
+Multisig GUI is a GUI based python tool for working with multisignature addresses in Bitcoin,Litecoin, and Dogecoin. It can create and keep track of multisignature addresses, send coins from a multisignature address, and create signatures for authorizing sends from multisignature addresses. 
 
-It does not download/process the blockchain directly, instead it uses third party API's (currently using
-blockchain.info) to query the blockchain data required to create transactions, keep track of account balances,
-and push transactions out to the network. All created cryptographic public/private keys are stored on disk using 
-Sqlite. 
+It does not download/process the blockchain directly, instead it uses third party API's (currently using blockchain.info) to query the blockchain data required to create transactions, keep track of account balances, and push transactions out to the network. All created cryptographic public/private keys are stored on disk using Sqlite. 
 
 The software is experimental, and is intended for advanced users only. 
 
