@@ -12,12 +12,29 @@ CRYPTO_TYPES=['Bitcoin','Litecoin','Dogecoin']
 MAX_M=10
 MAX_N=10
 
-def APP_ERROR(parent,msg):
+def dialog_showError(parent,msg):
     QMessageBox.critical(parent,"Error",msg)
     raise Exception(msg)
 
-def APP_MESSAGE(parent,msg):
+def dialog_showMessage(parent,msg):
     QMessageBox.about(parent,"Info",msg)
+
+
+def dialog_init(dialog,window_title,parent):
+    #QDialog.__init__(dialog,parent)
+    dialog.setWindowTitle(window_title)
+    dialog.layout=QGridLayout()
+    dialog.setLayout(dialog.layout)
+    dialog.list_of_widgets=[]
+
+def dialog_addWidget(dialog,widget):
+    dialog.layout.addWidget(widget)
+    dialog.list_of_widgets.append(widget)
+
+def dialog_disableAllWidgets(dialog):
+    for widget in dialog.list_of_widgets:
+        widget.setEnabled(False)
+
 
 # Base class for all dialogues 
 class BaseDialog(QDialog):
@@ -42,110 +59,99 @@ class BaseDialog(QDialog):
         self.resize(0,0)
         self.setFixedSize(self.size())
 
+
+
 class CreatePublicKeyDialog(QDialog):
     def __init__(self,crypto_type,parent=None):
+
         QDialog.__init__(self,parent)
         self.crypto_type=crypto_type
-        self.setWindowTitle("Create public key".format(self.crypto_type))
-        self.layout=QGridLayout()
-        self.setLayout(self.layout)
-
-        self.layout.addWidget(QLabel("Would you like to encrypt the private key with a password?")) 
+        dialog_init(self,"Create public key".format(self.crypto_type),parent)
+        dialog_addWidget(self,QLabel("Would you like to encrypt the private key with a password?")) 
         self.yes_encrypt_button=QPushButton("Yes")
         self.yes_encrypt_button.clicked.connect(self.case_yes_encrypt)
         self.no_encrypt_button=QPushButton("No")
         self.no_encrypt_button.clicked.connect(self.case_no_encrypt)
-        self.layout.addWidget(self.yes_encrypt_button)
-        self.layout.addWidget(self.no_encrypt_button)
-
-    def _disable_yes_no_buttons(self):
-        self.yes_encrypt_button.setEnabled(False)
-        self.no_encrypt_button.setEnabled(False)
-    
+        dialog_addWidget(self,self.yes_encrypt_button)
+        dialog_addWidget(self,self.no_encrypt_button)
+   
     def case_no_encrypt(self):
         self._disable_yes_no_buttons()
         pub_key=multisig_sqlite.create_key(self.crypto_type)
-        APP_MESSAGE(self,"Created public key:  "+pub_key)
+        dialog_showMessage(self,"Created public key:  "+pub_key)
  
     def case_yes_encrypt(self):
-        self._disable_yes_no_buttons()
-        self.layout.addWidget(QLabel("Enter Password"))
+        dialog_disableAllWidgets(self)
+        dialog_addWidget(self,QLabel("Enter Password"))
         self.pw_line_edit1=QLineEdit()
         self.pw_line_edit1.setEchoMode(QLineEdit.Password)
         self.pw_line_edit2=QLineEdit()
         self.pw_line_edit2.setEchoMode(QLineEdit.Password)
-        self.layout.addWidget(self.pw_line_edit1)
-        self.layout.addWidget(QLabel("Enter Password Again"))
-        self.layout.addWidget(self.pw_line_edit2)        
+        dialog_addWidget(self,self.pw_line_edit1)
+        dialog_addWidget(self,QLabel("Enter Password Again"))
+        dialog_addWidget(self,self.pw_line_edit2)        
         self.submit_pw_button=QPushButton("Submit") 
         self.submit_pw_button.clicked.connect(self.submit_password)
-        self.layout.addWidget(self.submit_pw_button)
+        dialog_addWidget(self,self.submit_pw_button)
     
     def submit_password(self):
-        self.pw_line_edit1.setEnabled(False)
-        self.pw_line_edit2.setEnabled(False)
-        self.submit_pw_button.setEnabled(False)
-
+        dialog_disableAllWidgets(self)
         if self.pw_line_edit1.text() != self.pw_line_edit2.text():
-            APP_ERROR(self,"Password does not match")
+            dialog_showError(self,"Password does not match")
         else: 
             password=str(self.pw_line_edit1.text())
 
         if len(password) == 0:
-            APP_ERROR(self,'Password is empty')
+            dialog_showError(self,'Password is empty')
         
-
         pub_key=multisig_sqlite.create_encrypted_key(self.crypto_type,password) 
-        APP_MESSAGE(self,"Created public key: "+pub_key)
+        dialog_showMessage(self,"Created public key: "+pub_key)
 
 
 class SendTransactionDialog(QDialog):
     def __init__(self,crypto_type,parent=None):
         QDialog.__init__(self,parent)
         self.crypto_type=crypto_type
-        self.setWindowTitle("Send transaction from {} multisignature address".format(self.crypto_type))
-        self.layout=QGridLayout()
+        dialog_init(self,"Send transaction from {} multisignature address".format(self.crypto_type),parent)
 
         label=QLabel("Select multisignature address to send from")
-        self.combo_box=QComboBox()
-        
+        self.combo_box=QComboBox()        
         addresses=multisig_sqlite.get_all_multisig_addresses(self.crypto_type)
         for address in addresses:
             self.combo_box.addItem(address[2])
 
         self.combo_box.activated.connect(self.address_chosen) 
-
-        self.layout.addWidget(label)
-        self.layout.addWidget(self.combo_box)
-        self.setLayout(self.layout)
+        dialog_addWidget(self,label)
+        dialog_addWidget(self,self.combo_box)
 
     def address_chosen(self):
         address=self.combo_box.currentText()
-        self.combo_box.setEnabled(False)
+        dialog_disableAllWidgets(self)
         label=QLabel("Enter destination address")
-        self.layout.addWidget(label)
+        dialog_addWidget(self,label)
         self.destination_line_edit=QLineEdit()
-        self.layout.addWidget(self.destination_line_edit)
+        dialog_addWidget(self,self.destination_line_edit)
         label=QLabel("Enter amount to send (satoshis)")
-        self.layout.addWidget(label)
+        dialog_addWidget(self,label)
         self.amount_line_edit=QLineEdit()
-        self.layout.addWidget(self.amount_line_edit) 
+        dialog_addWidget(self,self.amount_line_edit) 
         self.destination_button=QPushButton("Submit Destination")
         self.destination_button.clicked.connect(self.destination_chosen)
-        self.layout.addWidget(self.destination_button)
+        dialog_addWidget(self,self.destination_button)
 
     def destination_chosen(self):
         # disable buttons
-        self.destination_button.setEnabled(False)
-        self.destination_line_edit.setEnabled(False)
-        self.amount_line_edit.setEnabled(False)
+        dialog_disableAllWidgets(self)
+        #self.destination_button.setEnabled(False)
+        #self.destination_line_edit.setEnabled(False)
+        #self.amount_line_edit.setEnabled(False)
 
         # get destination and amount
         destination_address = str(self.destination_line_edit.text())
         try:
             amount              = int(str(self.amount_line_edit.text()))
         except ValueError:
-            APP_ERROR(self,"Amount must be an integer")
+            dialog_showError(self,"Amount must be an integer")
         multisig_addr       = str(self.combo_box.currentText())
         try:
             if self.crypto_type == 'Bitcoin':
@@ -153,14 +159,14 @@ class SendTransactionDialog(QDialog):
             else:
                 unspents        = utils.litecoin_unspent(multisig_addr)
         except Exception as e:
-            APP_ERROR(self,"Failed to get unspent amount from third party API")
+            dialog_showError(self,"Failed to get unspent amount from third party API")
         sum_unspents    = sum([unspent['value'] for unspent in unspents])
     
         if amount < 1: #dust? 
-            APP_ERROR(self,'Amount must be greater than dust') 
+            dialog_showError(self,'Amount must be greater than dust') 
         
         if sum_unspents < amount:
-            APP_ERROR(self,'Not enough unspent amount in addresss, unspent amount is '+str(sum_unspents))
+            dialog_showError(self,'Not enough unspent amount in addresss, unspent amount is '+str(sum_unspents))
 
         m,n     = multisig_sqlite.get_m_n_for_multisig_address(multisig_addr)
         tx_fees = 1
@@ -245,7 +251,7 @@ class SendTransactionDialog(QDialog):
             if len(password) != 0:
                 private_key=multisig_sqlite.decrypt_private_key(keys[key_i]['encrypted_private_key'],password)
                 if private_key == False:
-                    APP_ERROR(self,"Failed to decrypt, wrong password")
+                    dialog_showError(self,"Failed to decrypt, wrong password")
                 for unspent_i in range(0,len(unspents)):
                     signature=pybitcointools.multisign(tx,unspent_i,multisig_script,private_key)
                     self.sig_list.set(unspent_i,key_i,signature)
@@ -254,16 +260,16 @@ class SendTransactionDialog(QDialog):
             self.pass_and_sig_button.setEnabled(False)
             self.apply_signatures(tx,m,multisig_script)
         else:
-            APP_ERROR(self,"Not enough password/signatre was provided. Requires at least {}".format(m-num_unknown_keys))
+            dialog_showError(self,"Not enough password/signatre was provided. Requires at least {}".format(m-num_unknown_keys))
 
     def apply_signatures(self,tx,m,multisig_script):
         if not self.sig_list.is_complete(m):
-            APP_ERROR(self,"Not enough signatures")
+            dialog_showError(self,"Not enough signatures")
 
         for unspent_i in range(0,self.sig_list.num_unspents):
             cur_sig_list=self.sig_list.get_signatures_as_list(unspent_i)
             tx=pybitcointools.apply_multisignatures(tx,unspent_i,multisig_script,cur_sig_list)
-        APP_MESSAGE(self,tx)
+        dialog_showMessage(self,tx)
         return tx 
 
 class CreateMultiSigDialog(QDialog):
@@ -302,13 +308,13 @@ class CreateMultiSigDialog(QDialog):
         int_n=int(n)
         if int_m > MAX_M:
             error_msg='m is too large, maximum is:'+str(MAX_M)
-            APP_ERROR(self,error_msg)
+            dialog_showError(self,error_msg)
         if int_n >MAX_N:
             error_msg='n is too large, maximum is:'+str(MAX_N)
-            APP_ERROR(self,error_msg)
+            dialog_showError(self,error_msg)
         if int_m>int_n:
             error_msg='m:{} cannot be larger than n:{}'.format(int_m,int_n)
-            APP_ERROR(self,error_msg)
+            dialog_showError(self,error_msg)
         self.m=int_m
         self.n=int_n
         self.m_input.setEnabled(False)
@@ -349,7 +355,7 @@ class CreateMultiSigDialog(QDialog):
     def create_multisig_address(self):
         pub_key_list=[str(entry[0].text()) for entry in self.entry_button_list]         
         address= multisig_sqlite.create_multisig_address(self.crypto_type,self.m,self.n,pub_key_list)        
-        APP_MESSAGE(self,"Multisig address created: "+address)
+        dialog_showMessage(self,"Multisig address created: "+address)
         self.submit_button.setEnabled(False)
 
 class DecryptPrivKeyDialog(QDialog):
@@ -376,9 +382,9 @@ class DecryptPrivKeyDialog(QDialog):
         password=str(self.pass_line_edit.text())
         private_key=multisig_sqlite.decrypt_private_key(self.encrypted_private_key,password)
         if private_key == False:
-            APP_ERROR(self,"Failed to decrypt, wrong password") 
+            dialog_showError(self,"Failed to decrypt, wrong password") 
         else:
-            APP_MESSAGE(self,"Decrypted private key: "+private_key)
+            dialog_showMessage(self,"Decrypted private key: "+private_key)
 
 class ListPubKeyDialog(QDialog):
 
