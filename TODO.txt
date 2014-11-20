@@ -1,5 +1,7 @@
 TODO LIST
 
+LIst pub key need scroll in case n is too large
+
 Better Name ?
 
 Base dialogue class for cleaner code

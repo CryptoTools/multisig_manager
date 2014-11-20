@@ -21,7 +21,6 @@ def dialog_showMessage(parent,msg):
 
 
 def dialog_init(dialog,window_title,parent):
-    #QDialog.__init__(dialog,parent)
     dialog.setWindowTitle(window_title)
     dialog.layout=QGridLayout()
     dialog.setLayout(dialog.layout)
@@ -34,30 +33,9 @@ def dialog_addWidget(dialog,widget):
 def dialog_disableAllWidgets(dialog):
     for widget in dialog.list_of_widgets:
         widget.setEnabled(False)
-
-
-# Base class for all dialogues 
-class BaseDialog(QDialog):
-    def __init__(self,window_title,parent=None):
-        QDialog.__init__(self,parent)
-        self.setWindowTitle(window_title)
-        self.layout=QGridLayout()
-        self.setLayout(self.layout) 
-        self.list_of_widgets=[]
-
-    # add new widget in dialogue 
-    def addWidgetToDialog(self,widget):
-        self.layout.addWidget(widget) 
-        self.list_of_widgets.append(widget)
-   
-    # disable all widgets that have been added to dialogue 
-    def disableAllWidgets(self):
-        for widget in self.list_of_widgets:
-            widget.setEnabled(False)
-
-    def fixToMinimumSize(self):
-        self.resize(0,0)
-        self.setFixedSize(self.size())
+def dialog_setFixedSize(dialog):
+    dialog.resize(0,0)
+    dialog.setFixedSize(dialog.size())
 
 
 
@@ -74,9 +52,9 @@ class CreatePublicKeyDialog(QDialog):
         self.no_encrypt_button.clicked.connect(self.case_no_encrypt)
         dialog_addWidget(self,self.yes_encrypt_button)
         dialog_addWidget(self,self.no_encrypt_button)
-   
+        dialog_setFixedSize(self)
     def case_no_encrypt(self):
-        self._disable_yes_no_buttons()
+        dialog_disableAllWidgets(self)
         pub_key=multisig_sqlite.create_key(self.crypto_type)
         dialog_showMessage(self,"Created public key:  "+pub_key)
  
@@ -142,9 +120,6 @@ class SendTransactionDialog(QDialog):
     def destination_chosen(self):
         # disable buttons
         dialog_disableAllWidgets(self)
-        #self.destination_button.setEnabled(False)
-        #self.destination_line_edit.setEnabled(False)
-        #self.amount_line_edit.setEnabled(False)
 
         # get destination and amount
         destination_address = str(self.destination_line_edit.text())
@@ -213,26 +188,24 @@ class SendTransactionDialog(QDialog):
             self.apply_signatures(tx,m,multisig_script)
         else:
             dialog=QDialog(self)
-            dialog.layout=QGridLayout()
-            dialog.setLayout(dialog.layout)
-            dialog.setWindowTitle("Please provide signature or password") 
+            dialog_init(dialog,"Please provide signature or password")
             str_out="At least {} key(s) need to be unlocked to complete transaction".format(m - num_unknown_keys) 
-            dialog.layout.addWidget(QLabel(str_out))
+            dialog_addWidget(dialog,QLabel(str_out))
             for key,value in self.sig_entries.items():
-                dialog.layout.addWidget(QLabel("<b>Signature request</b>"))
-                dialog.layout.addWidget(value[0])
-                dialog.layout.addWidget(value[1])
+                dialog_addWidget(dialog,QLabel("<b>Signature request</b>"))
+                dialog_addWidget(dialog,value[0])
+                dialog_addWidget(dialog,value[1])
             for key,value in self.pass_entries.items():
 
-                dialog.layout.addWidget(QLabel("<b>Password request</b>"))
-                dialog.layout.addWidget(value[0])
-                dialog.layout.addWidget(value[1])
+                dialog_addWidget(dialog,QLabel("<b>Password request</b>"))
+                dialog_addWidget(dialog,value[0])
+                dialog_addWidget(dialog,value[1])
             self.pass_and_sig_button=QPushButton('Submit')
             self.pass_and_sig_button.clicked.connect(
                 lambda clicked,tx=tx,m=m,num_unknown_keys=num_unknown_keys,
                        multisig_script=multisig_script,keys=keys,unspents=unspents: 
                 self.get_pass_and_sig(tx,m,num_unknown_keys,multisig_script,keys,unspents))
-            dialog.layout.addWidget(self.pass_and_sig_button)
+            dialog_addWidget(dialog,self.pass_and_sig_button)
             dialog.show()
 
     def get_pass_and_sig(self,tx,m,num_unknown_keys,multisig_script,keys,unspents):
@@ -257,7 +230,7 @@ class SendTransactionDialog(QDialog):
                     self.sig_list.set(unspent_i,key_i,signature)
                 
         if self.sig_list.is_complete(m):
-            self.pass_and_sig_button.setEnabled(False)
+            dialog_disableAllWidgets(self)
             self.apply_signatures(tx,m,multisig_script)
         else:
             dialog_showError(self,"Not enough password/signatre was provided. Requires at least {}".format(m-num_unknown_keys))
@@ -276,8 +249,7 @@ class CreateMultiSigDialog(QDialog):
     def __init__(self,crypto_type,parent=None):
         QDialog.__init__(self,parent)
         self.crypto_type=crypto_type
-        self.setWindowTitle("Create Multisignature address")
-        self.layout=QGridLayout()
+        dialog_init(self,"Create Multisignature address",parent)
         
         m_label=QLabel()
         m_label.setText("m (required signatures)")
@@ -290,16 +262,15 @@ class CreateMultiSigDialog(QDialog):
         self.m_of_n_submit_button=QPushButton("Submit")
         self.m_of_n_submit_button.clicked.connect(self.process_m_of_n)
 
-        self.layout.addWidget(QLabel("<b>Create m of n multisignature address</b>"))   
-        self.layout.addWidget(m_label)
-        self.layout.addWidget(self.m_input)
+        dialog_addWidget(self,QLabel("<b>Create m of n multisignature address</b>"))   
+        dialog_addWidget(self,m_label)
+        dialog_addWidget(self,self.m_input)
 
-        self.layout.addWidget(n_label)
-        self.layout.addWidget(self.n_input)
-        
-        self.layout.addWidget(self.m_of_n_submit_button)
+        dialog_addWidget(self,n_label)
+        dialog_addWidget(self,self.n_input)        
+        dialog_addWidget(self,self.m_of_n_submit_button)
 
-        self.setLayout(self.layout)
+        dialog_setFixedSize(self)
 
     def process_m_of_n(self):
         m=self.m_input.text()
@@ -317,9 +288,7 @@ class CreateMultiSigDialog(QDialog):
             dialog_showError(self,error_msg)
         self.m=int_m
         self.n=int_n
-        self.m_input.setEnabled(False)
-        self.n_input.setEnabled(False)
-        self.m_of_n_submit_button.setEnabled(False)
+        dialog_disableAllWidgets(self)
 
 
         self.entry_button_list=[]
@@ -327,13 +296,13 @@ class CreateMultiSigDialog(QDialog):
             entry=QLineEdit()
             button=QPushButton("Select from created key ")
             button.clicked.connect(lambda clicked,index=i: self.show_key_list(index))
-            self.layout.addWidget(QLabel('Enter public key '+str(i+1)))
-            self.layout.addWidget(entry)
-            self.layout.addWidget(button)
+            dialog_addWidget(self,QLabel('Enter public key '+str(i+1)))
+            dialog_addWidget(self,entry)
+            dialog_addWidget(self,button)
             self.entry_button_list.append((entry,button))
         self.submit_button=QPushButton(text='Submit')
         self.submit_button.clicked.connect(self.create_multisig_address)
-        self.layout.addWidget(self.submit_button)
+        dialog_addWidget(self,self.submit_button)
  
     def show_key_list(self,entry_index):
         self.list_pubkey_dialog=ListPubKeyDialog(self.crypto_type,True)
@@ -356,7 +325,7 @@ class CreateMultiSigDialog(QDialog):
         pub_key_list=[str(entry[0].text()) for entry in self.entry_button_list]         
         address= multisig_sqlite.create_multisig_address(self.crypto_type,self.m,self.n,pub_key_list)        
         dialog_showMessage(self,"Multisig address created: "+address)
-        self.submit_button.setEnabled(False)
+        dialog_disableAllWidgets(self)
 
 class DecryptPrivKeyDialog(QDialog):
     def __init__(self,crypto_type,encrypted_private_key,parent=None):
@@ -395,11 +364,9 @@ class ListPubKeyDialog(QDialog):
         self.select_button_list=[]
         self.pub_key_list=[]
 
-        self.setWindowTitle("List {} Public Keys".format(self.crypto_type))
-        layout=QGridLayout()
+        dialog_init(self,"List {} Public Keys".format(self.crypto_type),parent)
 
         crypto_keys=multisig_sqlite.get_all_crypto_keys(crypto_type)
-
         self.table=QTableWidget()
         self.table.setRowCount(len(crypto_keys))
         if self.include_select_button==True:
@@ -456,8 +423,7 @@ class ListPubKeyDialog(QDialog):
             self.table.resizeColumnToContents(1)
             self.table.resizeColumnToContents(2)
 
-        layout.addWidget(self.table,0,0)
-        self.setLayout(layout)
+        dialog_addWidget(self,self.table)
  
 
     def _setItem(self,row_i,col_i,item):
@@ -473,10 +439,10 @@ class ListMultiSigDialog(QDialog):
     def __init__(self,crypto_type,parent=None):
         QDialog.__init__(self,parent)
         self.crypto_type=crypto_type
-        self.setWindowTitle("List Multisig Addresses")
-        layout=QGridLayout()
-        self.table=QTableWidget()
+        
+        dialog_init(self,"List Multisig Addresses",parent)
 
+        self.table=QTableWidget()
         multisig_addresses=multisig_sqlite.get_all_multisig_addresses(self.crypto_type)
         row_count=len(multisig_addresses)
         self.table.setRowCount(row_count)
@@ -514,8 +480,7 @@ class ListMultiSigDialog(QDialog):
         self.table.resizeColumnToContents(1)
         self.table.resizeColumnToContents(2)
 
-        layout.addWidget(self.table,0,0)
-        self.setLayout(layout)
+        dialog_addWidget(self,self.table)
     
     def _setItem(self,row_i,col_i,item):
         elem=QTableWidgetItem(item)
