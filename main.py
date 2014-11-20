@@ -12,6 +12,11 @@ CRYPTO_TYPES=['Bitcoin','Litecoin','Dogecoin']
 MAX_M=10
 MAX_N=10
 
+
+def dialog_getScreenSize():
+    screen=QDesktopWidget().screenGeometry()
+    return (screen.width(),screen.height())
+
 def dialog_showError(parent,msg):
     QMessageBox.critical(parent,"Error",msg)
     raise Exception(msg)
@@ -19,8 +24,7 @@ def dialog_showError(parent,msg):
 def dialog_showMessage(parent,msg):
     QMessageBox.about(parent,"Info",msg)
 
-
-def dialog_init(dialog,window_title,parent):
+def dialog_init(dialog,window_title,parent=None):
     dialog.setWindowTitle(window_title)
     dialog.layout=QGridLayout()
     dialog.setLayout(dialog.layout)
@@ -37,6 +41,22 @@ def dialog_setFixedSize(dialog):
     dialog.resize(0,0)
     dialog.setFixedSize(dialog.size())
 
+def dialog_addScrollArea(dialog,list_of_widgets_in_area):
+    scroll_area_layout=QGridLayout()
+    scroll_area_widget=QWidget()
+    scroll_area=QScrollArea()
+
+    scroll_area_widget.setLayout(scroll_area_layout)
+    scroll_area_width=dialog.size().width()
+    scroll_area_height=dialog_getScreenSize()[1] -dialog.size().height()-200
+    scroll_area.setFixedHeight(scroll_area_height)
+    scroll_area.setWidget(scroll_area_widget)
+    scroll_area.setWidgetResizable(True)
+    for widget in list_of_widgets_in_area:
+        scroll_area_layout.addWidget(widget)
+        dialog.list_of_widgets.append(widget)
+                
+    dialog.layout.addWidget(scroll_area)
 
 
 class CreatePublicKeyDialog(QDialog):
@@ -191,15 +211,21 @@ class SendTransactionDialog(QDialog):
             dialog_init(dialog,"Please provide signature or password")
             str_out="At least {} key(s) need to be unlocked to complete transaction".format(m - num_unknown_keys) 
             dialog_addWidget(dialog,QLabel(str_out))
+            scroll_area_widgets=[]
             for key,value in self.sig_entries.items():
-                dialog_addWidget(dialog,QLabel("<b>Signature request</b>"))
-                dialog_addWidget(dialog,value[0])
-                dialog_addWidget(dialog,value[1])
+                scroll_area_widgets.append(QLabel("<b>Signature request</b>"))
+                scroll_area_widgets.append(value[0])
+                scroll_area_widgets.append(value[1])
+
             for key,value in self.pass_entries.items():
 
-                dialog_addWidget(dialog,QLabel("<b>Password request</b>"))
-                dialog_addWidget(dialog,value[0])
-                dialog_addWidget(dialog,value[1])
+
+                scroll_area_widgets.append(QLabel("<b>Password request</b>"))
+                scroll_area_widgets.append(value[0])
+                scroll_area_widgets.append(value[1])
+            dialog_addScrollArea(dialog,scroll_area_widgets)
+
+
             self.pass_and_sig_button=QPushButton('Submit')
             self.pass_and_sig_button.clicked.connect(
                 lambda clicked,tx=tx,m=m,num_unknown_keys=num_unknown_keys,
@@ -292,16 +318,25 @@ class CreateMultiSigDialog(QDialog):
 
 
         self.entry_button_list=[]
+        self.scroll_area_widgets=[]
         for i in range(0,int_n):
+            label=QLabel('Enter public key '+str(i+1))
             entry=QLineEdit()
             button=QPushButton("Select from created key ")
             button.clicked.connect(lambda clicked,index=i: self.show_key_list(index))
-            dialog_addWidget(self,QLabel('Enter public key '+str(i+1)))
-            dialog_addWidget(self,entry)
-            dialog_addWidget(self,button)
+            self.scroll_area_widgets.append(label)
+            self.scroll_area_widgets.append(entry)
+            self.scroll_area_widgets.append(button)
+
+            #dialog_addWidget(self,label)
+            #dialog_addWidget(self,entry)
+            #dialog_addWidget(self,button)
             self.entry_button_list.append((entry,button))
         self.submit_button=QPushButton(text='Submit')
         self.submit_button.clicked.connect(self.create_multisig_address)
+        #self.scroll_area_widgets.append(self.submit_button)
+
+        dialog_addScrollArea(self,self.scroll_area_widgets) 
         dialog_addWidget(self,self.submit_button)
  
     def show_key_list(self,entry_index):

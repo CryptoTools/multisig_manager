@@ -1,5 +1,7 @@
 TODO LIST
 
+Implement BIP 10, signature distribution
+
 LIst pub key need scroll in case n is too large
 
 Better Name ?
