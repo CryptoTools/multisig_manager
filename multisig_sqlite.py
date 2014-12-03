@@ -1,6 +1,6 @@
 import datetime
 import sqlite3 
-import pybitcointools 
+import bitcoin
 import simplecrypt
 
 SQLITE_FILENAME='multisig_gui.db'
@@ -77,8 +77,8 @@ def create_multisig_address(crypto,m,n,pub_key_list):
             conn.commit()
         else:           
             crypto_key_id_list.append(rows[0][0])
-    script=pybitcointools.mk_multisig_script(pub_key_list,m)
-    address=pybitcointools.scriptaddr(script,SCRIPT_HASH_VERSION_BYTE[crypto])
+    script=bitcoin.mk_multisig_script(pub_key_list,m)
+    address=bitcoin.scriptaddr(script,SCRIPT_HASH_VERSION_BYTE[crypto])
     
     c.execute('INSERT INTO multisig_addr(crypto,address,m,n,timestamp) VALUES(?,?,?,?,?)',
               (crypto,address,m,n,datetime.datetime.now()))
@@ -94,8 +94,8 @@ def create_multisig_address(crypto,m,n,pub_key_list):
 
 # create private/public key pair
 def create_key(crypto):
-    private_key = pybitcointools.random_key()
-    public_key  = pybitcointools.privtopub(private_key)    
+    private_key = bitcoin.random_key()
+    public_key  = bitcoin.privtopub(private_key)    
     c.execute('INSERT INTO crypto_key (crypto,public_key,private_key,encrypted_private_key,timestamp) VALUES(?,?,?,?,?)',
         (crypto,public_key,private_key,0,datetime.datetime.now()))
     conn.commit()
@@ -104,8 +104,8 @@ def create_key(crypto):
 
 # create private/public key pair
 def create_encrypted_key(crypto,password):
-    private_key = pybitcointools.random_key()
-    public_key  = pybitcointools.privtopub(private_key)    
+    private_key = bitcoin.random_key()
+    public_key  = bitcoin.privtopub(private_key)    
     # encrypt private key here
     encrypted_private_key=simplecrypt.encrypt(password=password,data=private_key)
     c.execute('INSERT INTO crypto_key (crypto,public_key,private_key,encrypted_private_key,timestamp) VALUES(?,?,?,?,?)',
@@ -120,4 +120,32 @@ def decrypt_private_key(encrypted_private_key,password):
     except simplecrypt.DecryptionException:
         return False 
     return priv_key    
-        
+
+def import_key(crypto,private_key):
+    c.execute('SELECT * FROM crypto_key WHERE private_key = ?',(private_key,))
+    out=c.fetchall()
+    if len(out) != 0:
+        return None
+
+    public_key=bitcoin.privtopub(private_key)
+    c.execute('INSERT INTO crypto_key (crypto,public_key,private_key,encrypted_private_key,timestamp) VALUES(?,?,?,?,?)',
+        (crypto,public_key,private_key,0,datetime.datetime.now()))
+    conn.commit()
+    return public_key   
+
+def import_encrypted_key(crypto,private_key,password):
+    public_key  = bitcoin.privtopub(private_key)   
+    c.execute('SELECT * FROM crypto_key WHERE public_key = ?',(public_key,))
+    out=c.fetchall()
+    if len(out) != 0:      
+        return None
+
+
+    # encrypt private key here
+    encrypted_private_key=simplecrypt.encrypt(password=password,data=private_key)
+    c.execute('INSERT INTO crypto_key (crypto,public_key,private_key,encrypted_private_key,timestamp) VALUES(?,?,?,?,?)',
+        (crypto,public_key,0,encrypted_private_key,datetime.datetime.now()))
+    conn.commit()
+    return public_key
+
+

@@ -1,4 +1,6 @@
 pybitcointools/
+pybitcointools_orig/
+pybitcointools_kaykurokawa/
 *.db
 *.pyc
 *.swp

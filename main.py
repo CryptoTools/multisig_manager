@@ -1,17 +1,20 @@
 import sys
+import random 
 
 import multisig_sqlite
-import mg_utils
+import mm_utils
 
+from kcryptotools import pushtx
 import simplecrypt
-import pybitcointools
+import bitcoin
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-CRYPTO_TYPES=['Bitcoin','Litecoin','Dogecoin']
-MAX_M=10
-MAX_N=10
-
+CRYPTO_TYPES        = ['Bitcoin','Litecoin','Dogecoin']
+MIN_DEFAULT_TX_FEES = {'Bitcoin':10000,'Litecoin':10000,'Dogecoin':10000}
+NUM_PEERS_TO_SEND   = 40
+MAX_M               = 10
+MAX_N               = 10
 
 def dialog_getScreenSize():
     screen=QDesktopWidget().screenGeometry()
@@ -23,6 +26,14 @@ def dialog_showError(parent,msg):
 
 def dialog_showMessage(parent,msg):
     QMessageBox.about(parent,"Info",msg)
+
+def dialog_showLongMessage(parent,title,msg):
+    dialog=QDialog(parent)
+    dialog_init(dialog,title)
+    label=QLabel(msg)
+    label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+    dialog_addWidget(dialog,label)
+    dialog.show()
 
 def dialog_init(dialog,window_title,parent=None):
     dialog.setWindowTitle(window_title)
@@ -37,6 +48,7 @@ def dialog_addWidget(dialog,widget):
 def dialog_disableAllWidgets(dialog):
     for widget in dialog.list_of_widgets:
         widget.setEnabled(False)
+
 def dialog_setFixedSize(dialog):
     dialog.resize(0,0)
     dialog.setFixedSize(dialog.size())
@@ -59,12 +71,12 @@ def dialog_addScrollArea(dialog,list_of_widgets_in_area):
     dialog.layout.addWidget(scroll_area)
 
 
-class CreatePublicKeyDialog(QDialog):
+class CreateKeyDialog(QDialog):
     def __init__(self,crypto_type,parent=None):
 
         QDialog.__init__(self,parent)
         self.crypto_type=crypto_type
-        dialog_init(self,"Create public key".format(self.crypto_type),parent)
+        dialog_init(self,"Create {} public/private key pair".format(self.crypto_type),parent)
         dialog_addWidget(self,QLabel("Would you like to encrypt the private key with a password?")) 
         self.yes_encrypt_button=QPushButton("Yes")
         self.yes_encrypt_button.clicked.connect(self.case_yes_encrypt)
@@ -73,6 +85,7 @@ class CreatePublicKeyDialog(QDialog):
         dialog_addWidget(self,self.yes_encrypt_button)
         dialog_addWidget(self,self.no_encrypt_button)
         dialog_setFixedSize(self)
+
     def case_no_encrypt(self):
         dialog_disableAllWidgets(self)
         pub_key=multisig_sqlite.create_key(self.crypto_type)
@@ -100,17 +113,77 @@ class CreatePublicKeyDialog(QDialog):
             password=str(self.pw_line_edit1.text())
 
         if len(password) == 0:
-            dialog_showError(self,'Password is empty')
-        
+            dialog_showError(self,'Password is empty')        
         pub_key=multisig_sqlite.create_encrypted_key(self.crypto_type,password) 
         dialog_showMessage(self,"Created public key: "+pub_key)
 
 
-class SendTransactionDialog(QDialog):
+class ImportKeyDialog(QDialog):
     def __init__(self,crypto_type,parent=None):
         QDialog.__init__(self,parent)
         self.crypto_type=crypto_type
-        dialog_init(self,"Send transaction from {} multisignature address".format(self.crypto_type),parent)
+        dialog_init(self,"Import {} Private Key".format(self.crypto_type))
+       
+        label=QLabel("Enter private key in hex")
+        dialog_addWidget(self,label)
+        self.priv_key_line_edit=QLineEdit()
+        dialog_addWidget(self,self.priv_key_line_edit)
+        label=QLabel("Enter encryption passphrase (leave blank if encryption is undesired)")
+        dialog_addWidget(self,label)
+        self.passphrase1_line_edit=QLineEdit()
+        self.passphrase1_line_edit.setEchoMode(QLineEdit.Password)
+        dialog_addWidget(self,self.passphrase1_line_edit)
+        label=QLabel("Re-enter encyprtion passphrase (leave blank if encryption is undesired)")
+        dialog_addWidget(self,label)
+        self.passphrase2_line_edit=QLineEdit()
+        self.passphrase2_line_edit.setEchoMode(QLineEdit.Password)
+        dialog_addWidget(self,self.passphrase2_line_edit)
+
+        submit_button=QPushButton("Submit")
+
+        submit_button.clicked.connect(lambda clicked: self.import_key())
+        dialog_addWidget(self,submit_button)
+
+    def import_key(self):
+
+        dialog_disableAllWidgets(self)
+        private_key=str(self.priv_key_line_edit.text())
+        passphrase1=str(self.passphrase1_line_edit.text())
+        passphrase2=str(self.passphrase2_line_edit.text())
+             
+
+        if len(private_key)==0:
+            dialog_showError(self,"Private key Field is empty")
+        # no encryption
+        if len(passphrase1) == 0 and len(passphrase2)== 0 :
+            pub_key=multisig_sqlite.import_key(self.crypto_type,private_key)
+            if pub_key != None:
+                dialog_showMessage(self,"Imported public key:  "+pub_key)
+            else:
+                dialog_showError(self,"Private key already exists in database")
+
+        # with encrption
+        else:          
+            if passphrase1 != passphrase2:
+                dialog_showError(self,"Entered passphrases do not match")
+                return
+            pub_key=multisig_sqlite.import_encrypted_key(self.crypto_type,private_key,passphrase1)
+            if pub_key != None:
+                dialog_showMessage(self,"Imported public key:  "+pub_key)
+            else:
+                dialog_showError(self,"Private key already exists in database")
+
+
+
+class TransactionDialog(QDialog):
+    def __init__(self,crypto_type,get_signatures_only=False,parent=None):
+        QDialog.__init__(self,parent)
+        self.crypto_type=crypto_type
+        self.get_signatures_only=get_signatures_only
+        if self.get_signatures_only==True: 
+            dialog_init(self,"Sign transaction from {} multisignature address".format(self.crypto_type),parent)
+        else:
+            dialog_init(self,"Send transaction from {} multisignature address".format(self.crypto_type),parent)
 
         label=QLabel("Select multisignature address to send from")
         self.combo_box=QComboBox()        
@@ -123,21 +196,44 @@ class SendTransactionDialog(QDialog):
         dialog_addWidget(self,self.combo_box)
 
     def address_chosen(self):
-        address=self.combo_box.currentText()
+
+        multisig_addr       = str(self.combo_box.currentText())
+        try:
+            if self.crypto_type == 'Bitcoin':
+                unspents        = bitcoin.unspent(multisig_addr)
+            elif self.crypto_type == 'Litecoin':
+                unspents        = mm_utils.litecoin_unspent(multisig_addr)
+            elif self.crypto_type == 'Dogecoin':
+                unspents        = mm_utils.dogecoin_unspent(multisig_addr)
+            else:
+                raise Exception("Crypto not supported")
+        except Exception as e:
+            print(str(e))
+            dialog_showError(self,"Failed to get unspent amount from third party API")
+        sum_unspents    = sum([unspent['value'] for unspent in unspents])
+ 
+
         dialog_disableAllWidgets(self)
         label=QLabel("Enter destination address")
         dialog_addWidget(self,label)
         self.destination_line_edit=QLineEdit()
         dialog_addWidget(self,self.destination_line_edit)
-        label=QLabel("Enter amount to send (satoshis)")
+        label=QLabel("Enter amount to send in satoshis (maximum {})".format(sum_unspents))
         dialog_addWidget(self,label)
         self.amount_line_edit=QLineEdit()
         dialog_addWidget(self,self.amount_line_edit) 
+        label=QLabel("Enter transacion fee (recommended fee: {})".format(MIN_DEFAULT_TX_FEES[self.crypto_type]))
+        dialog_addWidget(self,label)
+        self.tx_fee_line_edit=QLineEdit()
+        dialog_addWidget(self,self.tx_fee_line_edit)
+
         self.destination_button=QPushButton("Submit Destination")
-        self.destination_button.clicked.connect(self.destination_chosen)
+        self.destination_button.clicked.connect(lambda clicked,multisig_addr=multisig_addr,unspents=unspents:
+            self.destination_chosen(multisig_addr,unspents))
         dialog_addWidget(self,self.destination_button)
 
-    def destination_chosen(self):
+    def destination_chosen(self,multisig_addr,unspents):
+
         # disable buttons
         dialog_disableAllWidgets(self)
 
@@ -147,48 +243,48 @@ class SendTransactionDialog(QDialog):
             amount              = int(str(self.amount_line_edit.text()))
         except ValueError:
             dialog_showError(self,"Amount must be an integer")
-        multisig_addr       = str(self.combo_box.currentText())
-        try:
-            if self.crypto_type == 'Bitcoin':
-                unspents        = pybitcointools.unspent(multisig_addr)
-            else:
-                unspents        = utils.litecoin_unspent(multisig_addr)
-        except Exception as e:
-            dialog_showError(self,"Failed to get unspent amount from third party API")
+
         sum_unspents    = sum([unspent['value'] for unspent in unspents])
-    
+        self.msg='Sending {} satoshis from address {} to {}'.format(amount,multisig_addr,destination_address)
+
         if amount < 1: #dust? 
             dialog_showError(self,'Amount must be greater than dust') 
         
         if sum_unspents < amount:
             dialog_showError(self,'Not enough unspent amount in addresss, unspent amount is '+str(sum_unspents))
-
+       
         m,n     = multisig_sqlite.get_m_n_for_multisig_address(multisig_addr)
-        tx_fees = 1
-        outs    = [{'value':amount-tx_fees,'address':destination_address}]
+        tx_fees = int(str(self.tx_fee_line_edit.text()))
+        change_amount = sum_unspents - amount - tx_fees
+        outs    = [{'value':amount,'address':destination_address}]
+        if change_amount > 0:
+            outs.append({'value':change_amount,'address':multisig_addr})
+        elif change_amount < 0:
+            dialog_showError(self,'tx fee and amount to send add up to more than available qty {}'.format(sum_unspents)) 
         ins     = [unspent['output'] for unspent in unspents]
-        tx      = pybitcointools.mktx(ins,outs)    
+        tx      = bitcoin.mktx(ins,outs)    
 
         keys            = multisig_sqlite.get_keys_for_multisig_address(multisig_addr)
         public_keys     = [key['public_key'] for key in keys]
-        multisig_script = pybitcointools.mk_multisig_script(public_keys,m)
+        multisig_script = bitcoin.mk_multisig_script(public_keys,m)
 
         num_encrypted_keys  = sum(key['private_key']==None and key['encrypted_private_key']!=None for key in keys)
         num_unknown_keys    = sum(key['private_key']==None and key['encrypted_private_key']==None for key in keys)
         num_known_keys      = len(keys) - num_encrypted_keys - num_unknown_keys
+
+
         self.sig_entries    = {} # key = (key index, unspent index) value = (QLabel, QLineEdit)
         self.pass_entries   = {} # key = key index value=(QLabel,QLineEdit)
-
-        self.sig_list=mg_utils.SignatureList(len(unspents),len(keys))
+        self.sig_list=mm_utils.SignatureList(len(unspents),len(keys))
+        sig_msg=''
         for key_i in range(0,len(keys)):
-            print('keys', keys[key_i] )
+
             # we need signature
             if keys[key_i]['private_key']==None and keys[key_i]['encrypted_private_key']==None: 
                 for unspent_i in range(0,len(unspents)):
                     label       = QLabel('Signature for public key: {}\n For tx: {}'.
                         format(keys[key_i]['public_key'],unspents[unspent_i]))
-                    line_edit   = QLineEdit()
-            
+                    line_edit   = QLineEdit() 
                     self.sig_entries[(key_i,unspent_i)]=(label,line_edit)
                     
             # we need password for encrypted key
@@ -196,21 +292,27 @@ class SendTransactionDialog(QDialog):
                 label       = QLabel('Password for public key: {}'.format(keys[key_i]['public_key']))
                 line_edit   = QLineEdit()
                 line_edit.setEchoMode(QLineEdit.Password)
-
                 self.pass_entries[key_i]=(label,line_edit)
 
             # we can get signature 
             else:
                 for unspent_i in range(0,len(unspents)):
-                    signature=pybitcointools.multisign(tx,unspent_i,multisig_script,keys[key_i]['private_key'])
+                    signature=bitcoin.multisign(tx,unspent_i,multisig_script,keys[key_i]['private_key'])
                     self.sig_list.set(unspent_i,key_i,signature)
+                    sig_msg+="Public key\n{}\nUnspent\n{}\nSignature\n{}\n\n".format(keys[key_i]['public_key'],
+                                                                                   unspents[unspent_i]['output'], signature)
+
+        if self.get_signatures_only == True:
+            sig_msg+='Tx\n{}\nMultisig Script\n{}\n\n'.format(tx,multisig_script)
+            dialog_showLongMessage(self,"Signature",sig_msg)
+            return
         if self.sig_list.is_complete(m):
             self.apply_signatures(tx,m,multisig_script)
         else:
-            dialog=QDialog(self)
-            dialog_init(dialog,"Please provide signature or password")
+            self.pass_and_sig_dialog=QDialog(self)
+            dialog_init(self.pass_and_sig_dialog,"Please provide signature or password")
             str_out="At least {} key(s) need to be unlocked to complete transaction".format(m - num_unknown_keys) 
-            dialog_addWidget(dialog,QLabel(str_out))
+            dialog_addWidget(self.pass_and_sig_dialog,QLabel(str_out))
             scroll_area_widgets=[]
             for key,value in self.sig_entries.items():
                 scroll_area_widgets.append(QLabel("<b>Signature request</b>"))
@@ -218,12 +320,10 @@ class SendTransactionDialog(QDialog):
                 scroll_area_widgets.append(value[1])
 
             for key,value in self.pass_entries.items():
-
-
                 scroll_area_widgets.append(QLabel("<b>Password request</b>"))
                 scroll_area_widgets.append(value[0])
                 scroll_area_widgets.append(value[1])
-            dialog_addScrollArea(dialog,scroll_area_widgets)
+            dialog_addScrollArea(self.pass_and_sig_dialog,scroll_area_widgets)
 
 
             self.pass_and_sig_button=QPushButton('Submit')
@@ -231,11 +331,10 @@ class SendTransactionDialog(QDialog):
                 lambda clicked,tx=tx,m=m,num_unknown_keys=num_unknown_keys,
                        multisig_script=multisig_script,keys=keys,unspents=unspents: 
                 self.get_pass_and_sig(tx,m,num_unknown_keys,multisig_script,keys,unspents))
-            dialog_addWidget(dialog,self.pass_and_sig_button)
-            dialog.show()
+            dialog_addWidget(self.pass_and_sig_dialog,self.pass_and_sig_button)
+            self.pass_and_sig_dialog.show()
 
     def get_pass_and_sig(self,tx,m,num_unknown_keys,multisig_script,keys,unspents):
-
         for key,value in self.sig_entries.items():
             entry=value[1]
             key_i=key[0]
@@ -252,30 +351,33 @@ class SendTransactionDialog(QDialog):
                 if private_key == False:
                     dialog_showError(self,"Failed to decrypt, wrong password")
                 for unspent_i in range(0,len(unspents)):
-                    signature=pybitcointools.multisign(tx,unspent_i,multisig_script,private_key)
+                    signature=bitcoin.multisign(tx,unspent_i,multisig_script,private_key)
                     self.sig_list.set(unspent_i,key_i,signature)
                 
         if self.sig_list.is_complete(m):
+            dialog_disableAllWidgets(self.pass_and_sig_dialog)
             dialog_disableAllWidgets(self)
             self.apply_signatures(tx,m,multisig_script)
         else:
-            dialog_showError(self,"Not enough password/signatre was provided. Requires at least {}".format(m-num_unknown_keys))
+            dialog_showError(self,"Not enough password/signature was provided. Requires at least {}".format(m-num_unknown_keys))
 
     def apply_signatures(self,tx,m,multisig_script):
         if not self.sig_list.is_complete(m):
             dialog_showError(self,"Not enough signatures")
-
+        random_key_set=random.sample(range(0,self.sig_list.num_keys),m)
+        print("keyset:",random_key_set)
         for unspent_i in range(0,self.sig_list.num_unspents):
-            cur_sig_list=self.sig_list.get_signatures_as_list(unspent_i)
-            tx=pybitcointools.apply_multisignatures(tx,unspent_i,multisig_script,cur_sig_list)
-        dialog_showMessage(self,tx)
+            cur_sig_list=self.sig_list.get_signatures_as_list(unspent_i,random_key_set)
+            tx=bitcoin.apply_multisignatures(tx,unspent_i,multisig_script,cur_sig_list)
+        dialog_showMessage(self,self.msg)
+        pushtx.pushtx(self.crypto_type,NUM_PEERS_TO_SEND,[tx])
         return tx 
 
 class CreateMultiSigDialog(QDialog):
     def __init__(self,crypto_type,parent=None):
         QDialog.__init__(self,parent)
         self.crypto_type=crypto_type
-        dialog_init(self,"Create Multisignature address",parent)
+        dialog_init(self,"Create {} multisignature address".format(crypto_type),parent)
         
         m_label=QLabel()
         m_label.setText("m (required signatures)")
@@ -328,19 +430,15 @@ class CreateMultiSigDialog(QDialog):
             self.scroll_area_widgets.append(entry)
             self.scroll_area_widgets.append(button)
 
-            #dialog_addWidget(self,label)
-            #dialog_addWidget(self,entry)
-            #dialog_addWidget(self,button)
             self.entry_button_list.append((entry,button))
         self.submit_button=QPushButton(text='Submit')
         self.submit_button.clicked.connect(self.create_multisig_address)
-        #self.scroll_area_widgets.append(self.submit_button)
 
         dialog_addScrollArea(self,self.scroll_area_widgets) 
         dialog_addWidget(self,self.submit_button)
  
     def show_key_list(self,entry_index):
-        self.list_pubkey_dialog=ListPubKeyDialog(self.crypto_type,True)
+        self.list_pubkey_dialog=ListKeyDialog(self.crypto_type,True)
         self.list_pubkey_dialog.show()
         pub_key_index=0
         for button in self.list_pubkey_dialog.select_button_list:
@@ -357,7 +455,14 @@ class CreateMultiSigDialog(QDialog):
         self.list_pubkey_dialog.close()
 
     def create_multisig_address(self):
-        pub_key_list=[str(entry[0].text()) for entry in self.entry_button_list]         
+        pub_key_list=[str(entry[0].text()) for entry in self.entry_button_list]     
+        pub_key_index=0
+        for pub_key in pub_key_list:
+            if len(pub_key)==0:
+                dialog_showError(self,"Public key {} is empty".format(pub_key_index))
+            if len(pub_key)!=130:
+                dialog_showError(self,"Public key {} is of invalid length".format(pub_key_index))
+            pub_key_index+=1
         address= multisig_sqlite.create_multisig_address(self.crypto_type,self.m,self.n,pub_key_list)        
         dialog_showMessage(self,"Multisig address created: "+address)
         dialog_disableAllWidgets(self)
@@ -390,7 +495,7 @@ class DecryptPrivKeyDialog(QDialog):
         else:
             dialog_showMessage(self,"Decrypted private key: "+private_key)
 
-class ListPubKeyDialog(QDialog):
+class ListKeyDialog(QDialog):
 
     def __init__(self,crypto_type,include_select_button,parent=None):
         QDialog.__init__(self,parent)
@@ -399,7 +504,7 @@ class ListPubKeyDialog(QDialog):
         self.select_button_list=[]
         self.pub_key_list=[]
 
-        dialog_init(self,"List {} Public Keys".format(self.crypto_type),parent)
+        dialog_init(self,"List {} public/private key pairs".format(self.crypto_type),parent)
 
         crypto_keys=multisig_sqlite.get_all_crypto_keys(crypto_type)
         self.table=QTableWidget()
@@ -475,7 +580,7 @@ class ListMultiSigDialog(QDialog):
         QDialog.__init__(self,parent)
         self.crypto_type=crypto_type
         
-        dialog_init(self,"List Multisig Addresses",parent)
+        dialog_init(self,"List {} multisig addresses".format(crypto_type),parent)
 
         self.table=QTableWidget()
         multisig_addresses=multisig_sqlite.get_all_multisig_addresses(self.crypto_type)
@@ -525,12 +630,11 @@ class ListMultiSigDialog(QDialog):
 class MyForm(QMainWindow):
     def __init__(self, parent=None):
         QMainWindow.__init__(self, parent)
-        self.setWindowTitle("Multisig GUI")
+        self.setWindowTitle("Multisig Manager")
 
         qwidget=QWidget()           
         self.layout=QGridLayout()
         qwidget.setLayout(self.layout) 
-
         
         self.layout.addWidget(QLabel("Select Crypto"))
         self.coin_select_combo_box=QComboBox()
@@ -540,39 +644,49 @@ class MyForm(QMainWindow):
 
         self.layout.addWidget(QLabel("Tasks"))
 
-        self.createPubKeyButton=QPushButton('Create Public Key')
-        self.layout.addWidget(self.createPubKeyButton)
-        self.listPubKeyButton=QPushButton('List Public Key')
-        self.layout.addWidget(self.listPubKeyButton)
+        self.createKeyButton=QPushButton('Create Public/Private Key Pair')
+        self.layout.addWidget(self.createKeyButton)
+        self.listKeyButton=QPushButton('List Public/Private Key Pairs')
+        self.layout.addWidget(self.listKeyButton)
+        
+        self.importKeyButton=QPushButton('Import key') 
+        self.layout.addWidget(self.importKeyButton)
+
         self.createMultisigButton=QPushButton('Create Multisignature Address')
         self.layout.addWidget(self.createMultisigButton)
         self.listMultisigButton=QPushButton('List Multisignature Address')
         self.layout.addWidget(self.listMultisigButton)
         self.sendTransactionButton=QPushButton('Send Transaction From Multisig Address')
         self.layout.addWidget(self.sendTransactionButton)
-        self.sentTransactionButton=QPushButton('Sign Transaction From Multisig Address') 
-       
+        self.signTransactionButton=QPushButton('Sign Transaction From Multisig Address')
+        self.layout.addWidget(self.signTransactionButton)
+        
         self.setCentralWidget(qwidget)
 
-        self.connect(self.createPubKeyButton,SIGNAL("clicked()"),self.createPubKey)
-        self.connect(self.listPubKeyButton,SIGNAL("clicked()"),self.listPubKey)
+        self.connect(self.createKeyButton,SIGNAL("clicked()"),self.createKey)
+        self.connect(self.listKeyButton,SIGNAL("clicked()"),self.listKey)
+        self.connect(self.importKeyButton,SIGNAL("clicked()"),self.importKey)
         self.connect(self.createMultisigButton,SIGNAL("clicked()"),self.createMultisig)
         self.connect(self.listMultisigButton,SIGNAL("clicked()"),self.listMultisig)
         self.connect(self.sendTransactionButton,SIGNAL("clicked()"),self.sendTransaction)
-        
+        self.connect(self.signTransactionButton,SIGNAL("clicked()"),self.signTransaction)
         self.resize(0,0)
         self.setFixedSize(self.size())
 
     def _getSelectedCrypto(self):
         return str(self.coin_select_combo_box.currentText())
     
-    def createPubKey(self):
-        self.create_pubkey_dialog=CreatePublicKeyDialog(self._getSelectedCrypto())
-        self.create_pubkey_dialog.show()
+    def createKey(self):
+        self.create_key_dialog=CreateKeyDialog(self._getSelectedCrypto())
+        self.create_key_dialog.show()
 
-    def listPubKey(self):
-        self.list_pubkey_dialog=ListPubKeyDialog(self._getSelectedCrypto(),False)
-        self.list_pubkey_dialog.show()
+    def listKey(self):
+        self.list_key_dialog=ListKeyDialog(self._getSelectedCrypto(),False)
+        self.list_key_dialog.show()
+
+    def importKey(self):
+        self.import_key_dialog=ImportKeyDialog(self._getSelectedCrypto())
+        self.import_key_dialog.show()
 
     def createMultisig(self):
         self.create=CreateMultiSigDialog(self._getSelectedCrypto())
@@ -583,8 +697,13 @@ class MyForm(QMainWindow):
         self.list_multisig_dialog.show()
 
     def sendTransaction(self):
-        self.send_dialog=SendTransactionDialog(self._getSelectedCrypto())
-        self.send_dialog.show()
+        self.tx_dialog=TransactionDialog(self._getSelectedCrypto())
+        self.tx_dialog.show()
+
+    def signTransaction(self):
+        self.tx_dialog=TransactionDialog(self._getSelectedCrypto(),True)
+        self.tx_dialog.show()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
