@@ -51,7 +51,20 @@ class SignatureList(object):
                 return False
         return True    
 
-
+def get_unspents(multisig_addr,crypto_type):
+    try:
+        if crypto_type.lower() == 'bitcoin':
+            unspents        = bitcoin.unspent(multisig_addr)
+        elif crypto_type.lower() == 'litecoin':
+            unspents        = bitcoin.litecoin_unspent(multisig_addr)
+        elif crypto_type.lower() == 'dogecoin':
+            unspents        = bitcoin.dogecoin_unspent(multisig_addr)
+        else:
+            return None
+        return unspents
+    except Exception as e:
+        print(str(e))
+        return None
 
 # Gets the unspent outputs of one or more dogecoin addresses
 # This works the same as the unspent function in bitcoin

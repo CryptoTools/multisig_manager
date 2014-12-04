@@ -5,6 +5,7 @@ import multisig_sqlite
 import mm_utils
 
 from kcryptotools import pushtx
+from kcryptotools import calc_txfee
 import simplecrypt
 import bitcoin
 from PyQt4.QtCore import *
@@ -69,6 +70,9 @@ def dialog_addScrollArea(dialog,list_of_widgets_in_area):
         dialog.list_of_widgets.append(widget)
                 
     dialog.layout.addWidget(scroll_area)
+
+
+
 
 
 class CreateKeyDialog(QDialog):
@@ -198,18 +202,12 @@ class TransactionDialog(QDialog):
     def address_chosen(self):
 
         multisig_addr       = str(self.combo_box.currentText())
-        try:
-            if self.crypto_type == 'Bitcoin':
-                unspents        = bitcoin.unspent(multisig_addr)
-            elif self.crypto_type == 'Litecoin':
-                unspents        = mm_utils.litecoin_unspent(multisig_addr)
-            elif self.crypto_type == 'Dogecoin':
-                unspents        = mm_utils.dogecoin_unspent(multisig_addr)
-            else:
-                raise Exception("Crypto not supported")
-        except Exception as e:
+        
+        unspents=mm_utils.get_unspents(multisig_addr,self.crypto_type)
+        if unspents == None:
             print(str(e))
             dialog_showError(self,"Failed to get unspent amount from third party API")
+        print unspents 
         sum_unspents    = sum([unspent['value'] for unspent in unspents])
  
 
@@ -222,11 +220,6 @@ class TransactionDialog(QDialog):
         dialog_addWidget(self,label)
         self.amount_line_edit=QLineEdit()
         dialog_addWidget(self,self.amount_line_edit) 
-        label=QLabel("Enter transacion fee (recommended fee: {})".format(MIN_DEFAULT_TX_FEES[self.crypto_type]))
-        dialog_addWidget(self,label)
-        self.tx_fee_line_edit=QLineEdit()
-        dialog_addWidget(self,self.tx_fee_line_edit)
-
         self.destination_button=QPushButton("Submit Destination")
         self.destination_button.clicked.connect(lambda clicked,multisig_addr=multisig_addr,unspents=unspents:
             self.destination_chosen(multisig_addr,unspents))
@@ -236,7 +229,7 @@ class TransactionDialog(QDialog):
 
         # disable buttons
         dialog_disableAllWidgets(self)
-
+           
         # get destination and amount
         destination_address = str(self.destination_line_edit.text())
         try:
@@ -254,13 +247,8 @@ class TransactionDialog(QDialog):
             dialog_showError(self,'Not enough unspent amount in addresss, unspent amount is '+str(sum_unspents))
        
         m,n     = multisig_sqlite.get_m_n_for_multisig_address(multisig_addr)
-        tx_fees = int(str(self.tx_fee_line_edit.text()))
-        change_amount = sum_unspents - amount - tx_fees
         outs    = [{'value':amount,'address':destination_address}]
-        if change_amount > 0:
-            outs.append({'value':change_amount,'address':multisig_addr})
-        elif change_amount < 0:
-            dialog_showError(self,'tx fee and amount to send add up to more than available qty {}'.format(sum_unspents)) 
+
         ins     = [unspent['output'] for unspent in unspents]
         tx      = bitcoin.mktx(ins,outs)    
 
@@ -272,6 +260,16 @@ class TransactionDialog(QDialog):
         num_unknown_keys    = sum(key['private_key']==None and key['encrypted_private_key']==None for key in keys)
         num_known_keys      = len(keys) - num_encrypted_keys - num_unknown_keys
 
+    
+        suggested_fee=calc_txfee.calc_txfee(tx,self.crypto_type)
+        tx_fees = QInputDialog.getText(self,"Enter transaction fee","Transaction fee (Recommended {})".format(suggested_fee))
+        tx_fees = int(str(tx_fees[0]))
+
+        change_amount = sum_unspents - amount - tx_fees
+        if change_amount > 0:
+            outs.append({'value':change_amount,'address':multisig_addr})
+        elif change_amount < 0:
+            dialog_showError(self,'tx fee and amount to send add up to more than available qty {}'.format(sum_unspents)) 
 
         self.sig_entries    = {} # key = (key index, unspent index) value = (QLabel, QLineEdit)
         self.pass_entries   = {} # key = key index value=(QLabel,QLineEdit)
@@ -591,8 +589,9 @@ class ListMultiSigDialog(QDialog):
         self.table.setHorizontalHeaderItem(0,QTableWidgetItem('Address'))
         self.table.setHorizontalHeaderItem(1,QTableWidgetItem('M of N'))
         self.table.setHorizontalHeaderItem(2,QTableWidgetItem('Creation Time'))
-        for i in range(3,MAX_N+3):
-            self.table.setHorizontalHeaderItem(i,QTableWidgetItem('Public Key '+str(i-2)))
+        self.table.setHorizontalHeaderItem(3,QTableWidgetItem('Balance'))
+        for i in range(4,MAX_N+4):
+            self.table.setHorizontalHeaderItem(i,QTableWidgetItem('Public Key '+str(i-3)))
 
         row_index=0
         for row in multisig_addresses:
@@ -610,6 +609,12 @@ class ListMultiSigDialog(QDialog):
             self._setItem(row_index,col_index,m_of_n_str)
             col_index+=1
             self._setItem(row_index,col_index,timestamp)
+            col_index+=1           
+            button=QPushButton('Click for balance')
+    
+            
+            button.clicked.connect(lambda clicked,addr=addr: dialog_showMessage( self,str(self._getBalance(addr))+' in address' ) )
+            self.table.setCellWidget(row_index,col_index,button)
             for key in multisig_sqlite.get_keys_for_multisig_address(addr):
                 col_index+=1 
                 self._setItem(row_index,col_index,key['public_key'])
@@ -621,12 +626,19 @@ class ListMultiSigDialog(QDialog):
         self.table.resizeColumnToContents(2)
 
         dialog_addWidget(self,self.table)
-    
+   
+
     def _setItem(self,row_i,col_i,item):
         elem=QTableWidgetItem(item)
         elem.setFlags(Qt.ItemIsEnabled)
         self.table.setItem(row_i,col_i,elem)
 
+    def _getBalance(self,address):
+        unspents=mm_utils.get_unspents(address,self.crypto_type)
+        if unspents == None:
+            dialog_showError(self,"Failed to get unspent amount from third party API")
+        sum_unspents    = sum([unspent['value'] for unspent in unspents])
+        return sum_unspents
 class MyForm(QMainWindow):
     def __init__(self, parent=None):
         QMainWindow.__init__(self, parent)
