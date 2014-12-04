@@ -12,8 +12,8 @@ Dependencies :
 
 PyQT 4
 PyCrypt 2.6.1
-simplecrypt by Andrew Cook (  https://github.com/andrewcooke/simple-crypt )
-pybitcointools library by Vitalik Buterin ( https://github.com/vbuterin/pybitcointools )
+simplecrypt by Andrew Cook (https://github.com/andrewcooke/simple-crypt )
+Forked pybitcointools library. Original pybitcointools by Vitalik Buterin  (https://github.com/kaykurokawa/pybitcointools)
 kcryptotools by Umpei Kay Kurokawa ( https://github.com/kaykurokawa/kcryptotools )
 
 Written and tested for Python 2.7 running under Ubuntu Linux 14.04

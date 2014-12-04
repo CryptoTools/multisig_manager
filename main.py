@@ -362,7 +362,13 @@ class TransactionDialog(QDialog):
     def apply_signatures(self,tx,m,multisig_script):
         if not self.sig_list.is_complete(m):
             dialog_showError(self,"Not enough signatures")
-        random_key_set=random.sample(range(0,self.sig_list.num_keys),m)
+        # available keys 
+        key_list=[]
+        for key_i in range(0,self.sig_list.num_keys):
+            if self.sig_list.key_is_complete(key_i):
+                key_list.append(key_i)
+
+        random_key_set=random.sample(key_list,m)
         print("keyset:",random_key_set)
         for unspent_i in range(0,self.sig_list.num_unspents):
             cur_sig_list=self.sig_list.get_signatures_as_list(unspent_i,random_key_set)
@@ -621,10 +627,8 @@ class ListMultiSigDialog(QDialog):
             
             row_index+=1
            
-        self.table.resizeColumnToContents(0)
-        self.table.resizeColumnToContents(1)
-        self.table.resizeColumnToContents(2)
-
+        for i in range(0,4):
+            self.table.resizeColumnToContents(i)
         dialog_addWidget(self,self.table)
    
 

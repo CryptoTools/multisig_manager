@@ -26,7 +26,7 @@ class SignatureList(object):
         out_list_keys=[]
 
         for key_i in list_key_indices:
-            if self._key_is_complete(key_i):
+            if self.key_is_complete(key_i):
                 for unspent_i in range(0,self.num_unspents):
                     out_list_keys.append( self.get(unspent_i,key_i) )
 
@@ -36,7 +36,7 @@ class SignatureList(object):
     def is_complete(self,m):
         num_complete_signatures=0
         for key_i in range(0,self.num_keys):
-            if self._key_is_complete(key_i):
+            if self.key_is_complete(key_i):
                 num_complete_signatures+=1
 
         if num_complete_signatures >= m:
@@ -45,7 +45,7 @@ class SignatureList(object):
             return False
 
     # key is complete if we have signatures for every unspent1
-    def _key_is_complete(self,key_i):
+    def key_is_complete(self,key_i):
         for unspent_i in range(0, self.num_unspents):
             if self.get(unspent_i,key_i) == None:
                 return False
@@ -65,72 +65,4 @@ def get_unspents(multisig_addr,crypto_type):
     except Exception as e:
         print(str(e))
         return None
-
-# Gets the unspent outputs of one or more dogecoin addresses
-# This works the same as the unspent function in bitcoin
-def dogecoin_unspent(*args):
-    # Valid input formats: unspent([addr1, addr2,addr3])
-    #                      unspent(addr1, addr2, addr3)
-    if len(args) == 0:
-        return []
-    elif isinstance(args[0], list):
-        addrs = args[0]
-    else:
-        addrs = args
-    u = []
-    for a in addrs:
-        try:
-            data = bitcoin.make_request('https://dogechain.info/api/v1/unspent/{}'.format(a))
-        except Exception, e:
-            if str(e) == 'No free outputs to spend':
-                continue
-            else:
-                raise Exception(e)
-        try:
-            jsonobj = json.loads(data)
-            for o in jsonobj["unspent_outputs"]:
-                h = o['tx_hash']
-                u.append({
-                    "output": h+':'+str(o['tx_output_n']),
-                    "value": int(o['value'])
-                })
-        except:
-            raise Exception("Failed to decode data: "+data)
-    return u
-
-
-
-# Gets the unspent outputs of one or more litecoin addresses
-# This works the same as the unspent function in bitcoin
-def litecoin_unspent(*args):
-    # Valid input formats: unspent([addr1, addr2,addr3])
-    #                      unspent(addr1, addr2, addr3)
-    if len(args) == 0:
-        return []
-    elif isinstance(args[0], list):
-        addrs = args[0]
-    else:
-        addrs = args
-    u = []
-    for a in addrs:
-        try:
-            data = bitcoin.make_request('https://litecoin.toshi.io/api/v0/addresses/{}/unspent_outputs'.format(a))
-        except Exception, e:
-            if str(e) == 'No free outputs to spend':
-                continue
-            else:
-                raise Exception(e)
-        try:
-            jsonobj = json.loads(data)
-            for o in jsonobj:
-                h = o['transaction_hash']
-                u.append({
-                    "output": h+':'+str(o['output_index']),
-                    "value": o['amount']
-                })
-        except:
-            raise Exception("Failed to decode data: "+data)
-    return u
-
-
 
