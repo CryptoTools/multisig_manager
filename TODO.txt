@@ -1,14 +1,16 @@
 TODO LIST
-problem with dogecoin tx with multiple unspents..
 
+signature gets cut off 
 
 Window/Mac support
 
-Need to balance/tx history(?) in multisig list 
+DONE Need to balance/tx history(?) in multisig list 
 
-Doge and Litecoin push tx not working
+DONE Doge and Litecoin push tx not working
     - is it possible for litecoin that we need to provide exactly 2 of 3 in a 2 of 3 multisig? providing 2 seems to work
     not 3 though...
+
+DONE problem with dogecoin tx with multiple unspents..
 
 Need option to encrypt imported key
 

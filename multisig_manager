@@ -35,7 +35,7 @@ def dialog_showMessage(parent,msg):
 def dialog_showLongMessage(parent,title,msg):
     dialog=QDialog(parent)
     dialog_init(dialog,title)
-    label=QLabel(msg)
+    label=QTextEdit(msg)
     label.setTextInteractionFlags(Qt.TextSelectableByMouse)
     dialog_addWidget(dialog,label)
     dialog.show()
@@ -307,11 +307,11 @@ class TransactionDialog(QDialog):
                 for unspent_i in range(0,len(unspents)):
                     signature=bitcoin.multisign(tx,unspent_i,multisig_script,keys[key_i]['private_key'])
                     self.sig_list.set(unspent_i,key_i,signature)
-                    sig_msg+="Public key\n{}\nUnspent\n{}\nSignature\n{}\n\n".format(keys[key_i]['public_key'],
+                    sig_msg+="Public key<br>{}<br>Unspent<br>{}<br>Signature<br>{}<p>".format(keys[key_i]['public_key'],
                                                                                    unspents[unspent_i]['output'], signature)
 
         if self.get_signatures_only == True:
-            sig_msg+='Tx\n{}\nMultisig Script\n{}\n\n'.format(tx,multisig_script)
+            sig_msg+='Tx<br>{}<p>Multisig Script<br>{}<p>'.format(tx,multisig_script)
             dialog_showLongMessage(self,"Signature",sig_msg)
             return
         if self.sig_list.is_complete(m):
