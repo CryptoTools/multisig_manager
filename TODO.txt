@@ -1,4 +1,8 @@
 TODO LIST
+problem with dogecoin tx with multiple unspents..
+
+
+Window/Mac support
 
 Need to balance/tx history(?) in multisig list 
 
@@ -38,9 +42,9 @@ DONE Way to switch between LTC and BTC (switch button on the menu in main window
 
 DONE pybitcointools require litecoin toshi unspent functions in bci.py for it to work with litecoins 
 
-Can put column for unspent amount in list multisig address 
+DONE Can put column for unspent amount in list multisig address 
 
-push tx script out to network
+DONE push tx script out to network
 
 Need to be able to copy stuff from list dialogue
 

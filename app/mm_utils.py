@@ -27,9 +27,9 @@ class SignatureList(object):
 
         for key_i in list_key_indices:
             if self.key_is_complete(key_i):
-                for unspent_i in range(0,self.num_unspents):
-                    out_list_keys.append( self.get(unspent_i,key_i) )
-
+                out_list_keys.append( self.get(unspent_i,key_i) )
+            else:
+                raise Exception("Key is not complete")
         return out_list_keys
 
     # return True if we have enough signatures for m of n transaction
