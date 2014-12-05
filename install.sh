@@ -8,4 +8,4 @@ git clone https://github.com/kaykurokawa/pybitcointools
 git clone https://github.com/kaykurokawa/kcryptotools
 (cd kcryptotools; python setup.py install)
 pip install pycrypto 
-pip install 
+sudo apt-get install python-qt4
