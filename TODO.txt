@@ -1,8 +1,13 @@
 TODO LIST
 
-signature gets cut off 
+
+Add labels for public keys and maybe multisig?
+
+Sortable columns on tables
 
 Window/Mac support
+
+DONE signature gets cut off 
 
 DONE Need to balance/tx history(?) in multisig list 
 
@@ -12,7 +17,7 @@ DONE Doge and Litecoin push tx not working
 
 DONE problem with dogecoin tx with multiple unspents..
 
-Need option to encrypt imported key
+DONE Need option to encrypt imported key
 
 DONE QMessagebox cuts off signature
 
@@ -26,13 +31,9 @@ DONE There is no unspent function for DOGECOIN
 DONE Transaction fees 
     - need adjustable based on size
 
-Add labels for public keys and maybe multisig?
-
-Sortable columns on tables
-
 DONE List pub key need scroll in case n is too large
 
-Better Name ? (Multi-crypto multi-sig manager) 
+DONE Better Name ? (Multi-crypto multi-sig manager) 
 
 DONE Bas dialogue class for cleaner code
 

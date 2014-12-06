@@ -2,7 +2,6 @@ Select Crypto allows you to choose which crypto currency you want to work with.
 
 Tasks are peformed for the crypto currency that you select. Below are the available tasks:
 
-
 Create Public/Private Key Pair, create a public/private key pair to be used in a multisignature address. 
 The key pair will be stored on disk. Private key can be chosen to be encrypted with a password. 
 
